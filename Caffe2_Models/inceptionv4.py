@@ -1,8 +1,13 @@
-from matplotlib import pyplot
+import skimage
+import skimage.io as io
+import skimage.transform 
+import sys
 import numpy as np
 import os
+import math
 import caffe2.python.predictor.predictor_exporter as pe
-
+from matplotlib import pyplot
+import matplotlib.image as mpimg
 from caffe2.python import (
 	brew,
 	core,
@@ -11,8 +16,8 @@ from caffe2.python import (
 	optimizer,
 	visualize,
 	workspace,
-
 	)
+
 class Inceptionv4():
 
 	'''
