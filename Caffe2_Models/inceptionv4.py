@@ -31,6 +31,8 @@ class Inceptionv4():
 		self.prev_blob = prev_blob
 		self.test_flag = test_flag
 		self.sp_batch_norm = sp_batch_norm
+		self.layer_num = 1
+		self.block_name = ''
 
 	def add_image_input(self, model, reader, batch_size, image_size, dtype):
 		data, label, additional_outputs = brew.image_input(
@@ -47,34 +49,6 @@ class Inceptionv4():
 			is_test= self.test_flag, 
 			)
 
-	def add_conv_layer(self, input_dims, output_dims, name, kernel, stride= 1, pad= 0, prev_blob= None):
-		if prev_blob == None:
-			self.prev_blob = brew.conv(
-				self.model,
-				self.prev_blob,
-				name,
-				input_dims,
-				output_dims,
-				kernel=kernel,
-				stride=stride,
-				pad=pad,
-				no_bias=1,
-				)
-		else:
-			self.prev_blob = brew.conv(
-				self.model,
-				prev_blob,
-				name,
-				input_dims,
-				output_dims,
-				kernel=kernel,
-				stride=stride,
-				pad=pad,
-				no_bias=1,
-				)
-
-		return self.prev_blob
-
 	def add_relu_activ(self):
 		self.prev_blob = brew.relu(
 			self.model,
@@ -83,15 +57,96 @@ class Inceptionv4():
 			)
 		return self.prev_blob
 
-	def add_max_pool(self, prev_blob, name, kernel, stride):
+	def add_sp_batch_norm(self, filters):
+		self.prev_blob = brew.spatial_bn(
+			self.model,
+			self.prev_blob,
+			('%s_sp_batch_norm_%d', self.block_name, self.layer_num),
+			filters,
+			epsilon=1e-3,
+			momentum=self.sp_batch_norm,
+			is_test= self.test_flag,
+			)
+		return self.prev_blob
+
+	def add_conv_layer(self, input_filters, output_filters, kernel, padding, stride= 1, prev_blob= None):
+		if prev_blob == None:
+			if pad == 'same':
+				self.prev_blob = brew.conv(
+					self.model,
+					self.prev_blob,
+					('%s_conv_%d', self.block_name, self.layer_num),
+					input_filters,
+					output_filters,
+					kernel= kernel,
+					stride= stride,
+					no_bias=1,
+					)
+			else:
+				self.prev_blob = brew.conv(
+					self.model,
+					self.prev_blob,
+					('%s_conv_%d', self.block_name, self.layer_num),
+					input_filters,
+					output_filters,
+					kernel= kernel,
+					stride= stride,
+					pad= 0,
+					no_bias=1,
+					)
+
+		else:
+			if pad == 'same':
+				self.prev_blob = brew.conv(
+					self.model,
+					prev_blob,
+					('%s_conv_%d', self.block_name, self.layer_num),
+					input_filters,
+					output_filters,
+					kernel= kernel,
+					stride= stride,
+					no_bias=1,
+					)
+			else:
+				self.prev_blob = brew.conv(
+					self.model,
+					self.prev_blob,
+					('%s_conv_%d', self.block_name, self.layer_num),
+					input_filters,
+					output_filters,
+					kernel= kernel,
+					stride= stride,
+					pad= 0,
+					no_bias=1,
+					)
+
+		self.add_sp_batch_norm(output_filters)
+		self.add_relu_activ()
+		self.layer_num += 1
+
+		return self.prev_blob
+
+	def add_max_pool(self, prev_blob, kernel, stride, pad= 0):
 		self.prev_blob = brew.max_pool(
 			self.model,
 			prev_blob,
-			name,
+			('%s_max_pool_%d', self.block_name, self.layer_num),
 			kernel= kernel,
 			stride= stride,
+			pad= pad,
 			)
 		return prev_blob
+
+	def add_avg_pool(self, prev_blob, kernel= 3,stride= 1,global_pool= False):
+		# no stride or kernel. I will trust the Caffe ConvBaseOp class.
+		self.prev_blob = brew.average_pool(
+			self.model,
+			prev_blob,
+			kernel= kernel,
+			stride= stride,
+			('%s_avg_pool_%d', self.block_name, self.layer_num),
+			global_pooling= global_pool,
+			)
 
 	def concat_layers(self, *args, axis=1):
 		self.prev_blob, split_info = brew.concat(
@@ -102,50 +157,44 @@ class Inceptionv4():
 		print(split_info)
 		return self.prev_blob
 
-	def add_sp_batch_norm(self, filters, name):
-		self.prev_blob = brew.spatial_bn(
-			self.model,
-			self.prev_blob,
-			name,
-			filters,
-			epsilon=1e-3,
-			momentum=self.sp_batch_norm,
-			is_test= self.test_flag,
-			)
-		return self.prev_blob
-
 	def Inception_Stem(self, model):
+		self.block_name = 'stem'
 
-		self.add_conv_layer(1, 32, 'conv1_stem', 3, stride= 2)
-		self.add_conv_layer(32, 32, 'conv2_stem', 3)
-		self.add_conv_layer(32, 64, 'conv3_stem', 3)
+		self.add_conv_layer(3, 32, 3, 'valid', stride= 2)
+		self.add_conv_layer(32, 32, 3, 'valid')
+		local_prev = self.add_conv_layer(32, 64, 3, 'same')
 
 		# creating conv layer first so we can utilize the prev_blob
-		self.add_conv_layer(64, 96, 'conv4_stem', 3, stride= 2)
+		self.add_conv_layer(64, 96, 3, 'valid', stride= 2)
 
-		self.add_max_pool('conv3_stem', 'pool1_stem', 3, 2)
+		local_prev = self.add_max_pool(local_prev, 3, 2)
 
-		concat1 = self.concat_layers('pool1_stem', 'conv4_stem')
+		concat1 = self.concat_layers(local_prev, self.prev_blob)
 
-		# can possibly make one layer as opposed to two
+		# utilize prev_blob here
+		self.add_conv_layer(160, 64, 1)
+		local_prev = self.add_conv_layer(64, 96, 3, 'valid')
 
-		self.add_conv_layer(160, 64, 'conv5_stem', 1)
-		self.add_conv_layer(64, 96, 'conv6_stem', 3)
+		self.add_conv_layer(160, 64, 1, prev_blob= concat1)
+		self.add_conv_layer(64, 64, (1, 7))
+		self.add_conv_layer(64, 64, (7, 1))
+		self.add_conv_layer(64, 96, 3, 'valid')
 
-		self.add_conv_layer(160, 64, 'conv7_stem', 1, prev_blob= 'pool1_stem')
-		self.add_conv_layer(64, 64, 'conv8_stem', (7, 1))
-		self.add_conv_layer(64, 64, 'conv9_stem', (1, 7))
-		self.add_conv_layer(64, 96, 'conv10_stem', 3)
+		concat2 = self.concat_layers(local_prev, self.prev_blob)
 
-		concat2 = self.concat_layers('conv6_stem', 'conv10_stem')
+		local_prev = self.add_max_pool(self.prev_blob, 1, 2)
+		self.add_conv_layer(192, 192, 3, 'valid', prev_blob= concat2)
 
-		self.add_max_pool('pool2_stem', self.prev_blob, 1, 2)
-		self.add_conv_layer(192, 192, 'conv11_stem', 3, prev_blob= concat2)
+		self.concat_layers(local_prev, self.prev_blob)
 
-		self.concat_layers('pool2_stem', 'conv11_stem')
+		return self.prev_blob
 
-	# def Inception_A(model):
+	def Inception_A(model, input):
+		self.layer_num = 1
+		self.block_name = 'block_A'
 
+		self.add_avg_pool(input)
+		self.add_conv_layer()
 
 	# def Inception_B(model):
 
