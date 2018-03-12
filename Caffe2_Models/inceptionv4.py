@@ -61,7 +61,7 @@ class Inceptionv4():
 		self.prev_blob = brew.spatial_bn(
 			self.model,
 			self.prev_blob,
-			('%s_sp_batch_norm_%d', self.block_name, self.layer_num),
+			'%s_sp_batch_norm_%d' % (self.block_name, self.layer_num),
 			filters,
 			epsilon=1e-3,
 			momentum=self.sp_batch_norm,
@@ -71,11 +71,11 @@ class Inceptionv4():
 
 	def add_conv_layer(self, input_filters, output_filters, kernel, padding, stride= 1, prev_blob= None):
 		if prev_blob == None:
-			if pad == 'same':
+			if padding == 'same':
 				self.prev_blob = brew.conv(
 					self.model,
 					self.prev_blob,
-					('%s_conv_%d', self.block_name, self.layer_num),
+					'%s_conv_%d' % (self.block_name, self.layer_num),
 					input_filters,
 					output_filters,
 					kernel= kernel,
@@ -86,7 +86,7 @@ class Inceptionv4():
 				self.prev_blob = brew.conv(
 					self.model,
 					self.prev_blob,
-					('%s_conv_%d', self.block_name, self.layer_num),
+					'%s_conv_%d' % (self.block_name, self.layer_num),
 					input_filters,
 					output_filters,
 					kernel= kernel,
@@ -96,11 +96,11 @@ class Inceptionv4():
 					)
 
 		else:
-			if pad == 'same':
+			if padding == 'same':
 				self.prev_blob = brew.conv(
 					self.model,
 					prev_blob,
-					('%s_conv_%d', self.block_name, self.layer_num),
+					'%s_conv_%d' % (self.block_name, self.layer_num),
 					input_filters,
 					output_filters,
 					kernel= kernel,
@@ -111,7 +111,7 @@ class Inceptionv4():
 				self.prev_blob = brew.conv(
 					self.model,
 					self.prev_blob,
-					('%s_conv_%d', self.block_name, self.layer_num),
+					'%s_conv_%d' % (self.block_name, self.layer_num),
 					input_filters,
 					output_filters,
 					kernel= kernel,
@@ -130,21 +130,21 @@ class Inceptionv4():
 		self.prev_blob = brew.max_pool(
 			self.model,
 			prev_blob,
-			('%s_max_pool_%d', self.block_name, self.layer_num),
+			'%s_max_pool_%d' % (self.block_name, self.layer_num),
 			kernel= kernel,
 			stride= stride,
 			pad= pad,
 			)
 		return prev_blob
 
-	def add_avg_pool(self, prev_blob, kernel= 3,stride= 1,global_pool= False):
+	def add_avg_pool(self, prev_blob, kernel= 3, stride= 1,global_pool= False):
 		# no stride or kernel. I will trust the Caffe ConvBaseOp class.
 		self.prev_blob = brew.average_pool(
 			self.model,
 			prev_blob,
+			'%s_avg_pool_%d' % (self.block_name, self.layer_num),
 			kernel= kernel,
 			stride= stride,
-			('%s_avg_pool_%d', self.block_name, self.layer_num),
 			global_pooling= global_pool,
 			)
 
@@ -194,7 +194,7 @@ class Inceptionv4():
 		self.block_name = 'block_A'
 
 		self.add_avg_pool(input)
-		self.add_conv_layer()
+		# self.add_conv_layer()
 
 	# def Inception_B(model):
 
@@ -214,7 +214,13 @@ if __name__ == '__main__':
 	core.GlobalInit(['caffe2', '--caffe2_log_level=2'])
 	arg_scope = {"order" : "NCHW"}
 
-	X = np.random.rand(299, 299, 3).astype(np.float32)
+	X = np.random.rand(3, 299, 299).astype(np.float32)
+
+	workspace.FeedBlob("test_input", X)
+
+	X2 = workspace.FetchBlob("test_input")
+
+	print(X2)
 
 	train_model = model_helper.ModelHelper(name="inceptionv4_train", arg_scope=arg_scope)
 
@@ -222,4 +228,4 @@ if __name__ == '__main__':
 
 	inception.Inception_Stem(train_model)
 
-	print(workspace.Blobs())
+	# print(workspace.Blobs())
