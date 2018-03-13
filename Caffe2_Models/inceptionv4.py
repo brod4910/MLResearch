@@ -195,37 +195,3 @@ class Inceptionv4():
 
 		self.add_avg_pool(input)
 		# self.add_conv_layer()
-
-	# def Inception_B(model):
-
-
-	# def Inception_C(model):
-
-
-	# def Reduction_A(model):
-
-
-	# def Reduction_B(model):
-
-
-# def create_Inception(model):
-
-if __name__ == '__main__':
-	core.GlobalInit(['caffe2', '--caffe2_log_level=2'])
-	arg_scope = {"order" : "NCHW"}
-
-	X = np.random.rand(3, 299, 299).astype(np.float32)
-
-	workspace.FeedBlob("test_input", X)
-
-	X2 = workspace.FetchBlob("test_input")
-
-	print(X2)
-
-	train_model = model_helper.ModelHelper(name="inceptionv4_train", arg_scope=arg_scope)
-
-	inception = Inceptionv4(train_model, X, 0,)
-
-	inception.Inception_Stem(train_model)
-
-	# print(workspace.Blobs())
