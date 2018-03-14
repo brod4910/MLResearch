@@ -26,7 +26,7 @@ class Inceptionv4():
 		prev_blob: prev_blob is the data that was taken from the dataset
 		sp_batch_norm: is the momentum for spatial batch normalization
 	'''
-	def __init__(self, model, prev_blob, test_flag, sp_batch_norm=.99):
+	def __init__(self, model, prev_blob, is_test, sp_batch_norm=.99):
 		self.model = model
 		self.prev_blob = prev_blob
 		self.test_flag = test_flag
@@ -34,21 +34,21 @@ class Inceptionv4():
 		self.layer_num = 1
 		self.block_name = ''
 
-	def add_image_input(self, model, reader, batch_size, image_size, dtype):
-		data, label, additional_outputs = brew.image_input(
-			model,
-			reader, ["data", "label"],
-			batch_size= batch_size,
-			output_type= dtype,
-			use_gpu_transform=True if model._device_type == 1 else False,
-			use_caffe_datum= True,
-			# mean= 128,
-			# std= 128,
-			color= 3,
-			crop= image_size,
-			is_test= self.test_flag, 
-			)
-	    data = model.StopGradient(data, data)
+	# def add_image_input(self, model, reader, batch_size, image_size, dtype):
+	# 	data, label, additional_outputs = brew.image_input(
+	# 		model,
+	# 		reader, ["data", "label"],
+	# 		batch_size= batch_size,
+	# 		output_type= dtype,
+	# 		use_gpu_transform=True if model._device_type == 1 else False,
+	# 		use_caffe_datum= True,
+	# 		# mean= 128,
+	# 		# std= 128,
+	# 		color= 3,
+	# 		crop= image_size,
+	# 		is_test= self.test_flag, 
+	# 		)
+	#     data = model.StopGradient(data, data)
 
 	def add_relu_activ(self):
 		self.prev_blob = brew.relu(
@@ -81,7 +81,7 @@ class Inceptionv4():
 					output_filters,
 					kernel= kernel,
 					stride= stride,
-					no_bias=1,
+					no_bias= True,
 					)
 			else:
 				self.prev_blob = brew.conv(
@@ -93,7 +93,7 @@ class Inceptionv4():
 					kernel= kernel,
 					stride= stride,
 					pad= 0,
-					no_bias=1,
+					no_bias= True,
 					)
 
 		else:
@@ -106,7 +106,7 @@ class Inceptionv4():
 					output_filters,
 					kernel= kernel,
 					stride= stride,
-					no_bias=1,
+					no_bias= True,
 					)
 			else:
 				self.prev_blob = brew.conv(
@@ -118,10 +118,10 @@ class Inceptionv4():
 					kernel= kernel,
 					stride= stride,
 					pad= 0,
-					no_bias=1,
+					no_bias= True,
 					)
 
-		self.add_sp_batch_norm(output_filters)
+		# self.add_sp_batch_norm(output_filters)
 		self.add_relu_activ()
 		self.layer_num += 1
 
@@ -149,6 +149,26 @@ class Inceptionv4():
 			)
 		return self.prev_blob
 
+	def add_dropout(self, prev_blob, ratio, is_test= False):
+		self.prev_blob, mask = brew.dropout(
+			self.model,
+			prev_blob,
+			ratio= ratio,
+			is_test= is_test
+			)
+		return self.prev_blob
+
+	def add_softmax(self, prev_blob, label= None):
+		if label is not None:
+			(softmax, loss) = self.model.SoftmaxWithLoss(
+				[prev_blob, label],
+				['softmax', 'loss'],
+				) 
+			return (softmax, loss)
+		else:
+			return brew.softmax(self.model, prev_blob, 'softmax')
+
+
 	def concat_layers(self, *args, axis=1):
 		self.prev_blob, split_info = brew.concat(
 			args,
@@ -158,7 +178,7 @@ class Inceptionv4():
 		print(split_info)
 		return self.prev_blob
 
-	def Inception_Stem(self, model):
+	def Inception_Stem(self):
 		self.add_conv_layer(3, 32, 3, 'valid', stride= 2)
 		self.add_conv_layer(32, 32, 3, 'valid')
 		local_prev = self.add_conv_layer(32, 64, 3, 'same')
@@ -266,4 +286,31 @@ class Inceptionv4():
 
 		return self.concat_layers(layer_1, layer_2, layer_3)
 
-def create_Inceptionv4()
+def create_Inceptionv4(model, data, num_labels, label= None,is_test= False, no_loss= False, no_bias= True):
+	# def __init__(self, model, prev_blob, test_flag, sp_batch_norm=.99):
+	inception = Inceptionv4(model, data, is_test)
+
+	prev_blob = inception.Inception_Stem()
+
+	for i in range(4):
+		prev_blob = inception.Inception_A(prev_blob)
+
+	prev_blob = inception.Reduction_A(prev_blob)
+
+	for i in range(7):
+		prev_blob = inception.Inception_B(prev_blob)
+
+	prev_blob = inception.Reduction_B(prev_blob)
+
+	for i in range(3):
+		prev_blob = inception.Inception_C(prev_blob)
+
+	prev_blob = inception.add_avg_pool(prev_blob)
+	prev_blob = inception.add_dropout(prev_blob, .8)
+
+	return inception.add_softmax(prev_blob, label)
+
+
+
+
+
