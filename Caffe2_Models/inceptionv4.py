@@ -135,10 +135,9 @@ class Inceptionv4():
 			stride= stride,
 			pad= pad,
 			)
-		return prev_blob
+		return self.prev_blob
 
-	def add_avg_pool(self, prev_blob, kernel= 3, stride= 1,global_pool= False):
-		# no stride or kernel. I will trust the Caffe ConvBaseOp class.
+	def add_avg_pool(self, prev_blob, kernel= 3, stride= 1, global_pool= False):
 		self.prev_blob = brew.average_pool(
 			self.model,
 			prev_blob,
@@ -147,6 +146,7 @@ class Inceptionv4():
 			stride= stride,
 			global_pooling= global_pool,
 			)
+		return self.prev_blob
 
 	def concat_layers(self, *args, axis=1):
 		self.prev_blob, split_info = brew.concat(
@@ -176,8 +176,8 @@ class Inceptionv4():
 		local_prev = self.add_conv_layer(64, 96, 3, 'valid')
 
 		self.add_conv_layer(160, 64, 1, prev_blob= concat1)
-		self.add_conv_layer(64, 64, (1, 7))
-		self.add_conv_layer(64, 64, (7, 1))
+		self.add_conv_layer(64, 64, (1, 7), 'same')
+		self.add_conv_layer(64, 64, (7, 1), 'same')
 		self.add_conv_layer(64, 96, 3, 'valid')
 
 		concat2 = self.concat_layers(local_prev, self.prev_blob)
@@ -189,9 +189,43 @@ class Inceptionv4():
 
 		return self.prev_blob
 
-	def Inception_A(model, input):
+	def Inception_A(self, input):
 		self.layer_num = 1
 		self.block_name = 'block_A'
 
 		self.add_avg_pool(input)
-		# self.add_conv_layer()
+		layer_1 = self.add_conv_layer(384, 96, 1, 'same')
+
+		layer_2 = self.add_conv_layer(384, 96, 1, 'same', prev_blob= input)
+
+		self.add_conv_layer(384, 64, 1, 'same', prev_blob = input)
+		layer_3 = self.add_conv_layer(64, 96, 3, 'same')
+
+		self.add_conv_layer(384, 64, 1, 'same', prev_blob= input)
+		self.add_conv_layer(64, 96, 3, 'same')
+		layer_4 = self.add_conv_layer(64, 96, 3, 'same')
+
+		return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
+
+	def Inception_B(self, input)
+		self.layer_num = 1
+		self.block_name = 'block_B'
+
+		self.add_avg_pool(input)
+		layer_1 = self.add_conv_layer(1024, 128, 1, 'same')
+
+		layer_2 = self.add_conv_layer(1024, 384, 1, 'same', prev_blob= input)
+
+		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
+		self.add_conv_layer(192, 224, (7, 1), 'same')
+		layer_3 = self.add_conv_layer(224, 256, (1, 7), 'same')
+
+		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
+		self.add_conv_layer(192, 192, (7, 1), 'same')
+		self.add_conv_layer(192, 224, (1, 7), 'same')
+		self.add_conv_layer(224, 224, (7, 1), 'same')
+		layer_4 = self.add_conv_layer(224, 256, (1, 7), 'same')
+
+		return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
+
+	def Inception_C(self, input)
