@@ -48,6 +48,7 @@ class Inceptionv4():
 			crop= image_size,
 			is_test= self.test_flag, 
 			)
+	    data = model.StopGradient(data, data)
 
 	def add_relu_activ(self):
 		self.prev_blob = brew.relu(
@@ -110,7 +111,7 @@ class Inceptionv4():
 			else:
 				self.prev_blob = brew.conv(
 					self.model,
-					self.prev_blob,
+					prev_blob,
 					'%s_conv_%d' % (self.block_name, self.layer_num),
 					input_filters,
 					output_filters,
@@ -158,8 +159,6 @@ class Inceptionv4():
 		return self.prev_blob
 
 	def Inception_Stem(self, model):
-		self.block_name = 'stem'
-
 		self.add_conv_layer(3, 32, 3, 'valid', stride= 2)
 		self.add_conv_layer(32, 32, 3, 'valid')
 		local_prev = self.add_conv_layer(32, 64, 3, 'same')
@@ -190,8 +189,6 @@ class Inceptionv4():
 		return self.prev_blob
 
 	def Inception_A(self, input):
-		self.layer_num = 1
-		self.block_name = 'block_A'
 
 		self.add_avg_pool(input)
 		layer_1 = self.add_conv_layer(384, 96, 1, 'same')
@@ -207,9 +204,7 @@ class Inceptionv4():
 
 		return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
 
-	def Inception_B(self, input)
-		self.layer_num = 1
-		self.block_name = 'block_B'
+	def Inception_B(self, input):
 
 		self.add_avg_pool(input)
 		layer_1 = self.add_conv_layer(1024, 128, 1, 'same')
@@ -228,4 +223,47 @@ class Inceptionv4():
 
 		return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
 
-	def Inception_C(self, input)
+	def Inception_C(self, input):
+
+		self.add_avg_pool(input)
+		layer_1 = self.add_conv_layer(1536, 256, 1, 'same')
+
+		layer_2 = self.add_conv_layer(1536, 256, 1, 'same', prev_blob= input)
+
+		sub_layer_1 = self.add_conv_layer(1536, 384, 1, 'same', prev_blob= input)
+		layer_3 = self.add_conv_layer(384, 256, (3, 1), 'same', prev_blob= sub_layer_1)
+		layer_4 = self.add_conv_layer(384, 256. (1, 3), 'same', prev_blob= sub_layer_1)
+
+		self.add_conv_layer(1536, 384, 1, 'same', prev_blob= input)
+		self.add_conv_layer(384, 448, (3, 1), 'same')
+		sub_layer_2 = self.add_conv_layer(448, 512, (1, 3), 'same')
+		layer_5 = self.add_conv_layer(512, 256, (3, 1), 'same', prev_blob= sub_layer_2)
+		layer_6 = self.add_conv_layer(512, 256, (1, 3), 'same', prev_blob= sub_layer_2)
+
+		return self.concat_layers(layer_1, layer_2, layer_3, layer_4, layer_5, layer_6)
+
+	def Reduction_A(self, input):
+		layer_1 = self.add_max_pool(input, 3, 2)
+
+		layer_2 = self.add_conv_layer(384, 384, 3, 'valid', stride= 2, prev_blob= input)
+
+		self.add_conv_layer(384, 192, 1, 'same', prev_blob= input)
+		self.add_conv_layer(192, 224, 3, 'same',)
+		layer_3 = self.add_conv_layer(224, 256, 3, 'valid', stride= 2)
+
+		return self.concat_layers(layer_1, layer_2, layer_3)
+
+	def Reduction_B(self, input):
+		layer_1 = self.add_max_pool(input, 3, 2)
+
+		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
+		layer_2 = self.add_conv_layer(192, 192, 3, 'valid', stride= 2)
+
+		self.add_conv_layer(1024, 256, 1, 'same', prev_blob= input)
+		self.add_conv_layer(256, 256, (1, 7), 'same')
+		self.add_conv_layer(256, 320, (7, 1), 'same')
+		layer_3 = self.add_conv_layer(320, 320, 3, 'valid', stride= 2)
+
+		return self.concat_layers(layer_1, layer_2, layer_3)
+
+def create_Inceptionv4()
