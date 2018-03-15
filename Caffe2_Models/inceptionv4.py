@@ -152,7 +152,7 @@ class Inceptionv4():
 		return self.prev_blob
 
 	def add_dropout(self, prev_blob, ratio, is_test= False):
-		self.prev_blob, mask = brew.dropout(
+		self.prev_blob = brew.dropout(
 			self.model,
 			prev_blob,
 			'%s_dropout_%d' % (self.block_name, self.layer_num),
@@ -199,8 +199,8 @@ class Inceptionv4():
 		local_prev = self.add_conv_layer(64, 96, 3, 'valid')
 
 		self.add_conv_layer(160, 64, 1, 'same',prev_blob= concat1)
-		self.add_conv_layer(64, 64, (7, 1), 'same')
-		self.add_conv_layer(64, 64, (1, 7), 'same')
+		self.add_conv_layer(64, 64, [7, 1], 'same')
+		self.add_conv_layer(64, 64, [1, 7], 'same')
 		self.add_conv_layer(64, 96, 3, 'valid')
 
 		concat2 = self.concat_layers(local_prev, self.prev_blob)
@@ -236,14 +236,14 @@ class Inceptionv4():
 		layer_2 = self.add_conv_layer(1024, 384, 1, 'same', prev_blob= input)
 
 		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
-		self.add_conv_layer(192, 224, (1, 7), 'same')
-		layer_3 = self.add_conv_layer(224, 256, (1, 7), 'same')
+		self.add_conv_layer(192, 224, [1, 7], 'same')
+		layer_3 = self.add_conv_layer(224, 256, [1, 7], 'same')
 
 		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
-		self.add_conv_layer(192, 192, (1, 7), 'same')
-		self.add_conv_layer(192, 224, (7, 1), 'same')
-		self.add_conv_layer(224, 224, (1, 7), 'same')
-		layer_4 = self.add_conv_layer(224, 256, (7, 1), 'same')
+		self.add_conv_layer(192, 192, [1, 7], 'same')
+		self.add_conv_layer(192, 224, [7, 1], 'same')
+		self.add_conv_layer(224, 224, [1, 7], 'same')
+		layer_4 = self.add_conv_layer(224, 256, [7, 1], 'same')
 
 		return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
 
@@ -255,14 +255,14 @@ class Inceptionv4():
 		layer_2 = self.add_conv_layer(1536, 256, 1, 'same', prev_blob= input)
 
 		sub_layer_1 = self.add_conv_layer(1536, 384, 1, 'same', prev_blob= input)
-		layer_3 = self.add_conv_layer(384, 256. (1, 3), 'same', prev_blob= sub_layer_1)
-		layer_4 = self.add_conv_layer(384, 256, (3, 1), 'same', prev_blob= sub_layer_1)
+		layer_3 = self.add_conv_layer(384, 256, [1, 3], 'same', prev_blob= sub_layer_1)
+		layer_4 = self.add_conv_layer(384, 256, [3, 1], 'same', prev_blob= sub_layer_1)
 
 		self.add_conv_layer(1536, 384, 1, 'same', prev_blob= input)
-		self.add_conv_layer(384, 448, (1, 3), 'same')
-		sub_layer_2 = self.add_conv_layer(448, 512, (3, 1), 'same')
-		layer_5 = self.add_conv_layer(512, 256, (3, 1), 'same', prev_blob= sub_layer_2)
-		layer_6 = self.add_conv_layer(512, 256, (1, 3), 'same', prev_blob= sub_layer_2)
+		self.add_conv_layer(384, 448, [1, 3], 'same')
+		sub_layer_2 = self.add_conv_layer(448, 512, [3, 1], 'same')
+		layer_5 = self.add_conv_layer(512, 256, [3, 1], 'same', prev_blob= sub_layer_2)
+		layer_6 = self.add_conv_layer(512, 256, [1, 3], 'same', prev_blob= sub_layer_2)
 
 		return self.concat_layers(layer_1, layer_2, layer_3, layer_4, layer_5, layer_6)
 
@@ -286,8 +286,8 @@ class Inceptionv4():
 		layer_2 = self.add_conv_layer(192, 192, 3, 'valid', stride= 2)
 
 		self.add_conv_layer(1024, 256, 1, 'same', prev_blob= input)
-		self.add_conv_layer(256, 256, (1, 7), 'same')
-		self.add_conv_layer(256, 320, (7, 1), 'same')
+		self.add_conv_layer(256, 256, [1, 7], 'same')
+		self.add_conv_layer(256, 320, [7, 1], 'same')
 		layer_3 = self.add_conv_layer(320, 320, 3, 'valid', stride= 2)
 
 		return self.concat_layers(layer_1, layer_2, layer_3)
