@@ -23,6 +23,7 @@ from caffe2.python import (
 from caffe2.python import data_parallel_model_utils, dyndep, optimizer
 from caffe2.python import timeout_guard
 from caffe2.proto import caffe2_pb2
+from IPython import display
 
 import inceptionv4
 # from caffe2.python.modeling.initializers import Initializer, PseudoFP16Initializer
@@ -90,6 +91,10 @@ def Train_Model():
 	# print(str(train_model.param_init_net.Proto())[:400] + '\n...')
 
 	for b in workspace.Blobs(): print(b)
+
+	graph = net_drawer.GetPydotGraphMinimal(train_model.net.Proto().op, "Inception", rankdir="LR", minimal_dependency=True)
+	graph.write_png("Inception.png")
+	# display.Image(graph.create_png(), width=800)
 
 	# pyplot.figure()
 	# blob = workspace.FetchBlob('label')
