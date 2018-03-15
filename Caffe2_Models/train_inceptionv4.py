@@ -82,6 +82,8 @@ def Train_Model():
 	# print('Print data: \n', data)
 	# print('Print labels: \n', label)
 
+	inception = inceptionv4.create_Inceptionv4(train_model, data, 4, label)
+
 	workspace.RunNetOnce(train_model.param_init_net)
 	# workspace.RunNet(train_model.net)
 	# print(str(train_model.net.Proto())[:] + '\n...')

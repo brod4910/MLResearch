@@ -29,7 +29,7 @@ class Inceptionv4():
 	def __init__(self, model, prev_blob, is_test, sp_batch_norm=.99):
 		self.model = model
 		self.prev_blob = prev_blob
-		self.test_flag = test_flag
+		self.is_test = is_test
 		self.sp_batch_norm = sp_batch_norm
 		self.layer_num = 1
 		self.block_name = ''
@@ -46,7 +46,7 @@ class Inceptionv4():
 	# 		# std= 128,
 	# 		color= 3,
 	# 		crop= image_size,
-	# 		is_test= self.test_flag, 
+	# 		is_test= self.is_test, 
 	# 		)
 	#     data = model.StopGradient(data, data)
 
@@ -66,7 +66,7 @@ class Inceptionv4():
 			filters,
 			epsilon=1e-3,
 			momentum=self.sp_batch_norm,
-			is_test= self.test_flag,
+			is_test= self.is_test,
 			)
 		return self.prev_blob
 
@@ -136,6 +136,7 @@ class Inceptionv4():
 			stride= stride,
 			pad= pad,
 			)
+		self.layer_num += 1
 		return self.prev_blob
 
 	def add_avg_pool(self, prev_blob, kernel= 3, stride= 1, global_pool= False):
@@ -147,15 +148,18 @@ class Inceptionv4():
 			stride= stride,
 			global_pooling= global_pool,
 			)
+		self.layer_num += 1
 		return self.prev_blob
 
 	def add_dropout(self, prev_blob, ratio, is_test= False):
 		self.prev_blob, mask = brew.dropout(
 			self.model,
 			prev_blob,
+			'%s_dropout_%d' % (self.block_name, self.layer_num),
 			ratio= ratio,
 			is_test= is_test
 			)
+		self.layer_num += 1
 		return self.prev_blob
 
 	def add_softmax(self, prev_blob, label= None):
@@ -168,14 +172,14 @@ class Inceptionv4():
 		else:
 			return brew.softmax(self.model, prev_blob, 'softmax')
 
-
 	def concat_layers(self, *args, axis=1):
-		self.prev_blob, split_info = brew.concat(
+		self.prev_blob = brew.concat(
+			self.model,
 			args,
-			axis,
+			'%s_concat_%d' % (self.block_name, self.layer_num),
 			)
 
-		print(split_info)
+		self.layer_num += 1
 		return self.prev_blob
 
 	def Inception_Stem(self):
@@ -184,17 +188,17 @@ class Inceptionv4():
 		local_prev = self.add_conv_layer(32, 64, 3, 'same')
 
 		# creating conv layer first so we can utilize the prev_blob
-		self.add_conv_layer(64, 96, 3, 'valid', stride= 2)
+		conv1 = self.add_conv_layer(64, 96, 3, 'valid', stride= 2)
 
-		local_prev = self.add_max_pool(local_prev, 3, 2)
+		self.add_max_pool(local_prev, 3, 2)
 
-		concat1 = self.concat_layers(local_prev, self.prev_blob)
+		concat1 = self.concat_layers('stem_concat_1', conv1, self.prev_blob)
 
 		# utilize prev_blob here
-		self.add_conv_layer(160, 64, 1)
+		self.add_conv_layer(160, 64, 1, 'same')
 		local_prev = self.add_conv_layer(64, 96, 3, 'valid')
 
-		self.add_conv_layer(160, 64, 1, prev_blob= concat1)
+		self.add_conv_layer(160, 64, 1, 'same',prev_blob= concat1)
 		self.add_conv_layer(64, 64, (7, 1), 'same')
 		self.add_conv_layer(64, 64, (1, 7), 'same')
 		self.add_conv_layer(64, 96, 3, 'valid')
@@ -230,7 +234,7 @@ class Inceptionv4():
 		layer_1 = self.add_conv_layer(1024, 128, 1, 'same')
 
 		layer_2 = self.add_conv_layer(1024, 384, 1, 'same', prev_blob= input)
-		
+
 		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
 		self.add_conv_layer(192, 224, (1, 7), 'same')
 		layer_3 = self.add_conv_layer(224, 256, (1, 7), 'same')
@@ -263,6 +267,7 @@ class Inceptionv4():
 		return self.concat_layers(layer_1, layer_2, layer_3, layer_4, layer_5, layer_6)
 
 	def Reduction_A(self, input):
+
 		layer_1 = self.add_max_pool(input, 3, 2)
 
 		layer_2 = self.add_conv_layer(384, 384, 3, 'valid', stride= 2, prev_blob= input)
@@ -274,6 +279,7 @@ class Inceptionv4():
 		return self.concat_layers(layer_1, layer_2, layer_3)
 
 	def Reduction_B(self, input):
+
 		layer_1 = self.add_max_pool(input, 3, 2)
 
 		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
@@ -286,31 +292,45 @@ class Inceptionv4():
 
 		return self.concat_layers(layer_1, layer_2, layer_3)
 
-def create_Inceptionv4(model, data, num_labels, label= None,is_test= False, no_loss= False, no_bias= True):
-	# def __init__(self, model, prev_blob, test_flag, sp_batch_norm=.99):
+def create_Inceptionv4(model, data, num_labels, label= None, is_test= False, no_loss= False, no_bias= True):
+
 	inception = Inceptionv4(model, data, is_test)
 
+	inception.block_name = 'stem'
 	prev_blob = inception.Inception_Stem()
+	
+	inception.block_name = 'block_A'
+	inception.layer_num = 1
 
 	for i in range(4):
 		prev_blob = inception.Inception_A(prev_blob)
 
+	inception.block_name = 'reduction_A'
+	inception.layer_num = 1
+
 	prev_blob = inception.Reduction_A(prev_blob)
+
+	inception.block_name = 'block_B'
+	inception.layer_num = 1
 
 	for i in range(7):
 		prev_blob = inception.Inception_B(prev_blob)
 
+	inception.block_name = 'reduction_B'
+	inception.layer_num = 1
+
 	prev_blob = inception.Reduction_B(prev_blob)
+
+	inception.block_name = 'block_C'
+	inception.layer_num = 1
 
 	for i in range(3):
 		prev_blob = inception.Inception_C(prev_blob)
+
+	inception.block_name = 'end_layers'
+	inception.layer_num = 1
 
 	prev_blob = inception.add_avg_pool(prev_blob)
 	prev_blob = inception.add_dropout(prev_blob, .8)
 
 	return inception.add_softmax(prev_blob, label)
-
-
-
-
-
