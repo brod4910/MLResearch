@@ -195,8 +195,8 @@ class Inceptionv4():
 		local_prev = self.add_conv_layer(64, 96, 3, 'valid')
 
 		self.add_conv_layer(160, 64, 1, prev_blob= concat1)
-		self.add_conv_layer(64, 64, (1, 7), 'same')
 		self.add_conv_layer(64, 64, (7, 1), 'same')
+		self.add_conv_layer(64, 64, (1, 7), 'same')
 		self.add_conv_layer(64, 96, 3, 'valid')
 
 		concat2 = self.concat_layers(local_prev, self.prev_blob)
@@ -230,16 +230,16 @@ class Inceptionv4():
 		layer_1 = self.add_conv_layer(1024, 128, 1, 'same')
 
 		layer_2 = self.add_conv_layer(1024, 384, 1, 'same', prev_blob= input)
-
+		
 		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
-		self.add_conv_layer(192, 224, (7, 1), 'same')
+		self.add_conv_layer(192, 224, (1, 7), 'same')
 		layer_3 = self.add_conv_layer(224, 256, (1, 7), 'same')
 
 		self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
-		self.add_conv_layer(192, 192, (7, 1), 'same')
-		self.add_conv_layer(192, 224, (1, 7), 'same')
-		self.add_conv_layer(224, 224, (7, 1), 'same')
-		layer_4 = self.add_conv_layer(224, 256, (1, 7), 'same')
+		self.add_conv_layer(192, 192, (1, 7), 'same')
+		self.add_conv_layer(192, 224, (7, 1), 'same')
+		self.add_conv_layer(224, 224, (1, 7), 'same')
+		layer_4 = self.add_conv_layer(224, 256, (7, 1), 'same')
 
 		return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
 
@@ -251,12 +251,12 @@ class Inceptionv4():
 		layer_2 = self.add_conv_layer(1536, 256, 1, 'same', prev_blob= input)
 
 		sub_layer_1 = self.add_conv_layer(1536, 384, 1, 'same', prev_blob= input)
-		layer_3 = self.add_conv_layer(384, 256, (3, 1), 'same', prev_blob= sub_layer_1)
-		layer_4 = self.add_conv_layer(384, 256. (1, 3), 'same', prev_blob= sub_layer_1)
+		layer_3 = self.add_conv_layer(384, 256. (1, 3), 'same', prev_blob= sub_layer_1)
+		layer_4 = self.add_conv_layer(384, 256, (3, 1), 'same', prev_blob= sub_layer_1)
 
 		self.add_conv_layer(1536, 384, 1, 'same', prev_blob= input)
-		self.add_conv_layer(384, 448, (3, 1), 'same')
-		sub_layer_2 = self.add_conv_layer(448, 512, (1, 3), 'same')
+		self.add_conv_layer(384, 448, (1, 3), 'same')
+		sub_layer_2 = self.add_conv_layer(448, 512, (3, 1), 'same')
 		layer_5 = self.add_conv_layer(512, 256, (3, 1), 'same', prev_blob= sub_layer_2)
 		layer_6 = self.add_conv_layer(512, 256, (1, 3), 'same', prev_blob= sub_layer_2)
 
