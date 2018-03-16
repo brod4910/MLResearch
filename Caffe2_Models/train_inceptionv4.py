@@ -31,81 +31,111 @@ import caffe2.python.predictor.predictor_exporter as pred_exp
 import caffe2.python.predictor.predictor_py_utils as pred_utils
 from caffe2.python.predictor_constants import predictor_constants as predictor_constants
 
-
-def AddInput(model, batch_size, db, db_type):
-    # load the data
-    data_uint8, label = brew.db_input(
+def AddImageInput(model, reader, batch_size, img_size, dtype, is_test):
+    '''
+    The image input operator loads image and label data from the reader and
+    applies transformations to the images (random cropping, mirroring, ...).
+    '''
+    data, label = brew.image_input(
         model,
-        blobs_out=["data_uint8", "label"],
+        reader, ["data", "label"],
         batch_size=batch_size,
-        db=db,
-        db_type=db_type,
+        # output_type=dtype,
+        use_gpu_transform=False,
+        use_caffe_datum=False,
+        # mean=128.,
+        # std=128.,
+        scale=299,
+        crop=img_size,
+        db_type= 'lmdb',
+        # mirror=1,
+        is_test=is_test,
     )
-    # cast the data to float
-    data = model.Cast(data_uint8, "data", to=core.DataType.FLOAT)
-    # scale data from [0,255] down to [0,1]
-    data = model.Scale(data, data, scale=float(1./256))
-    # don't need the gradient for the backward pass
+
     data = model.StopGradient(data, data)
     return data, label
 
 def Train_Model():
-	current_folder = os.path.join(os.path.expanduser('~'), 'Development', 'MLResearch', 'datasets',
-	 'blood-cells')
-	print(current_folder)
-	data_folder = os.path.join(current_folder, 'dataset2-master')
-	root_folder = current_folder
-	db_missing = False
+    current_folder = os.path.join(os.path.expanduser('~'), 'Development', 'MLResearch', 'datasets',
+     'blood-cells')
+    print(current_folder)
+    data_folder = os.path.join(current_folder, 'dataset2-master')
+    root_folder = current_folder
+    db_missing = False
 
-	if not os.path.exists(data_folder):
-	    os.makedirs(data_folder)   
-	    print("Your data folder was not found!! This was generated: {}".format(data_folder))
+    if not os.path.exists(data_folder):
+        os.makedirs(data_folder)   
+        print("Your data folder was not found!! This was generated: {}".format(data_folder))
 
-	# Look for existing database: lmdb
-	if os.path.exists(os.path.join(data_folder,'blood_cells_train_lmdb')):
-	    print("lmdb train db found!")
-	else:
-	    db_missing = True
-	    
-	if os.path.exists(os.path.join(data_folder,'blood_cells_test_lmdb')):
-	    print("lmdb test db found!")
-	else:
-	    db_missing = True
+    # Look for existing database: lmdb
+    if os.path.exists(os.path.join(data_folder,'blood_cells_train_lmdb')):
+        print("lmdb train db found!")
+    else:
+        db_missing = True
+        
+    if os.path.exists(os.path.join(data_folder,'blood_cells_test_lmdb')):
+        print("lmdb test db found!")
+    else:
+        db_missing = True
 
-	# print("training data folder:" + data_folder)
-	# print("workspace root folder:" + root_folder)
+    arg_scope = {
+    "order" : "NCHW",
+    "use_cudnn" : False,
+    }
+    train_model = model_helper.ModelHelper(name="inceptionv4_train", arg_scope=arg_scope)
 
-	arg_scope = {"order" : "NCHW"}
-	train_model = model_helper.ModelHelper(name="inceptionv4_train", arg_scope=arg_scope)
+    reader = train_model.CreateDB(
+        "reader",
+        db= os.path.join(data_folder,'blood_cells_train_lmdb'),
+        db_type= 'lmdb',
+        )
 
+    data, label = AddImageInput(train_model, reader, 64, 299, 'lmdb', False)
 
-	data, label = AddInput(train_model, batch_size=64, db=os.path.join(data_folder,'blood_cells_train_lmdb'), db_type='lmdb')
-	# print('Print data: \n', data)
-	# print('Print labels: \n', label)
+    # data, label = AddInput(train_model, batch_size=64, db=os.path.join(data_folder,'blood_cells_train_lmdb'), db_type='lmdb')
 
-	inception = inceptionv4.create_Inceptionv4(train_model, data, 4, label)
+    softmax, loss = inceptionv4.create_Inceptionv4(train_model, data, 4, label)
 
-	workspace.RunNetOnce(train_model.param_init_net)
-	# workspace.RunNet(train_model.net)
-	# print(str(train_model.net.Proto())[:] + '\n...')
-	# print(str(train_model.param_init_net.Proto())[:400] + '\n...')
+    accuracy = train_model.Accuracy([softmax, label], "accuracy")
 
-	for b in workspace.Blobs(): print(b)
+    train_model.AddGradientOperators([loss])
+    optimizer.build_adam(
+        train_model,
+        base_learning_rate=.001,
+        )
 
-	graph = net_drawer.GetPydotGraphMinimal(train_model.net.Proto().op, "Inception", rankdir="LR", minimal_dependency=True)
-	graph.write_png("Inception.png")
-	# display.Image(graph.create_png(), width=800)
+    train_model.Print('accuracy', [], to_file=1)
+    train_model.Print('loss', [], to_file=1)
+    train_model.Print('stem_concat_13', [])
 
-	# pyplot.figure()
-	# blob = workspace.FetchBlob('label')
-	# _ = visualize.NCHW.ShowMultiple(blob)
-	# pyplot.show()
+    workspace.RunNetOnce(train_model.param_init_net)
+    workspace.CreateNet(train_model.net, overwrite=True)
 
-	# inception = Inceptionv4(train_model, X, 0,)
+    # pyplot.figure()
+    # d = workspace.FetchBlob('data')
+    # # _ = visualize.NCHW.ShowMultiple(data)
+    # pyplot.show()
 
-	# inception.Inception_Stem(train_model)
+    total_iters = 200
+    accuracy = np.zeros(total_iters)
+    loss = np.zeros(total_iters)
+
+    for i in range(total_iters):
+        workspace.RunNet(train_model.net)
+        accuracy[i] = workspace.blobs['accuracy']
+        loss[i] = workspace.blobs['loss']
+
+    pyplot.plot(loss, 'b')
+    pyplot.plot(accuracy, 'r')
+    pyplot.legend(('Loss', 'Accuracy'), loc='upper right')
+
+    pyplot.show()
+    # for b in workspace.Blobs(): print(b)
+
+    # graph = net_drawer.GetPydotGraphMinimal(train_model.net.Proto().op, "Inception", rankdir="LR", minimal_dependency=True)
+    # graph.write_png("Inception.png")
 
 
 if __name__ == '__main__':
-	core.GlobalInit(['caffe2', '--caffe2_log_level=0'])
-	Train_Model()
+    core.GlobalInit(['caffe2', '--caffe2_log_level=0'])
+    Train_Model()

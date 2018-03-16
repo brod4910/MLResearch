@@ -1,1 +1,3 @@
-/Users/brianrodriguez/anaconda3/bin/make_image_db -color -db lmdb -input_folder ./ -list_file ../../../labels_test.txt -num_threads 8 -output_db_name ../../../blood_cells_test_lmdb -raw -scale 299 -shuffle
+rm -rf ./blood_cells_test_lmdb && /Users/brianrodriguez/anaconda3/bin/make_image_db -color -db lmdb -input_folder ./images/TEST/COMBINED_CELLS/ -list_file ./labels_test.txt -num_threads 8 -output_db_name ./blood_cells_test_lmdb -raw -scale 299 -shuffle
+
+rm -rf ./blood_cells_train_lmdb && /Users/brianrodriguez/anaconda3/bin/make_image_db -color -db lmdb -input_folder ./images/TRAIN/COMBINED_CELLS/ -list_file ./labels_train.txt -num_threads 8 -output_db_name ./blood_cells_train_lmdb -raw -scale 299 -shuffle
