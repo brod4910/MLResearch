@@ -4,7 +4,7 @@ import skimage.transform
 import sys
 import numpy as np
 import os
-import math
+from math import ceil
 import caffe2.python.predictor.predictor_exporter as pe
 from matplotlib import pyplot
 import matplotlib.image as mpimg
@@ -54,79 +54,41 @@ class Inceptionv4():
             )
         return self.prev_blob
 
-    def calculate_padding(self, prev_blob, kerenl, stride):
-        if prev_blob is not None:
-            row = prev_blob.Shape[2]
-            col = prev_blob.Shape[1]
-            R_out = ceil(float(row)/float(stride))
-            C_out = ceil(float(col)/float(stride))
+    def calculate_padding(self, padding_type, kernel):
+        assert padding_type in ['same', 'valid']
+        if padding_type == 'same':
+            return list((k - 1) // 2 for k in kernel)
+        return list(0 for __ in kernel)
 
-            Pr = ((R_out - 1) * stride + kernel - row)
-            Pc = ((C_out - 1) * stride + kernel - col)
-            return [Pr, Pc]
+    def add_conv_layer(self, input_filters, output_filters, kernel, padding_type, stride= 1, prev_blob= None):
+        padding = self.calculate_padding(padding_type, kernel)
+
+        if prev_blob is None:
+            self.prev_blob = brew.conv(
+            self.model,
+            self.prev_blob,
+            '%s_conv_%d' % (self.block_name, self.layer_num),
+            input_filters,
+            output_filters,
+            kernel= kernel,
+            stride= stride,
+            pad_h= padding[0],
+            pad_w= padding[1],
+            no_bias= True,
+            )
         else:
-            row = self.prev_blob.Shape[2]
-            col = self.prev_blob.Shape[1]
-            R_out = ceil(float(row)/float(stride))
-            C_out = ceil(float(col)/float(stride))
-
-            Pr = ((R_out - 1) * stride + kernel - row)
-            Pc = ((C_out - 1) * stride + kernel - col)
-            return [Pr, Pc]
-
-    def add_conv_layer(self, input_filters, output_filters, kernel, padding, stride= 1, prev_blob= None):
-        pad = calculate_padding(prev_blob, kernel, stride)
-
-        if prev_blob == None:
-            if padding == 'same':
-                self.prev_blob = brew.conv(
+            self.prev_blob = brew.conv(
                 self.model,
-                self.prev_blob,
+                prev_blob,
                 '%s_conv_%d' % (self.block_name, self.layer_num),
                 input_filters,
                 output_filters,
                 kernel= kernel,
                 stride= stride,
-                pad= pad,
+                pad_h= padding[0],
+                pad_w= padding[1],
                 no_bias= True,
                 )
-            else:
-                self.prev_blob = brew.conv(
-                    self.model,
-                    self.prev_blob,
-                    '%s_conv_%d' % (self.block_name, self.layer_num),
-                    input_filters,
-                    output_filters,
-                    kernel= kernel,
-                    stride= stride,
-                    pad= 0,
-                    no_bias= True,
-                    )
-        else:
-            if padding == 'same':
-                self.prev_blob = brew.conv(
-                    self.model,
-                    prev_blob,
-                    '%s_conv_%d' % (self.block_name, self.layer_num),
-                    input_filters,
-                    output_filters,
-                    kernel= kernel,
-                    stride= stride,
-                    pad= pad,
-                    no_bias= True,
-                    )
-            else:
-                self.prev_blob = brew.conv(
-                    self.model,
-                    prev_blob,
-                    '%s_conv_%d' % (self.block_name, self.layer_num),
-                    input_filters,
-                    output_filters,
-                    kernel= kernel,
-                    stride= stride,
-                    pad= 0,
-                    no_bias= True,
-                    )
 
         # self.add_sp_batch_norm(output_filters)
         self.add_relu_activ()
@@ -192,29 +154,28 @@ class Inceptionv4():
         return self.prev_blob
 
     def Inception_Stem(self, data):
-        self.add_conv_layer(3, 32, [3,3], 'valid', stride= 2, prev_blob= data)
-        self.add_conv_layer(32, 32, [3,3], 'valid')
-        conv0 = self.add_conv_layer(32, 64, [3,3], 'same')
+        self.add_conv_layer(3, 32, [3, 3], 'valid', stride= 2, prev_blob= data)
+        self.add_conv_layer(32, 32, [3, 3], 'valid')
+        conv0 = self.add_conv_layer(32, 64, [3, 3], 'same')
 
-        conv1 = self.add_conv_layer(64, 96, [3,3], 'valid', stride= 2, prev_blob= conv0)
+        conv1 = self.add_conv_layer(64, 96, [3, 3], 'valid', stride= 2, prev_blob= conv0)
 
         maxpool1 = self.add_max_pool(conv0, 3, 2)
 
         concat1 = self.concat_layers(conv1, maxpool1)
 
-        # utilize prev_blob here
         self.add_conv_layer(160, 64, [1, 1], 'same', prev_blob= concat1)
-        conv2 = self.add_conv_layer(64, 96, [3,3], 'valid')
+        conv2 = self.add_conv_layer(64, 96, [3, 3], 'valid')
 
         self.add_conv_layer(160, 64, [1, 1], 'same', prev_blob= concat1)
         self.add_conv_layer(64, 64, [1, 7], 'same')
         self.add_conv_layer(64, 64, [7, 1], 'same')
-        conv3 = self.add_conv_layer(64, 96, [3,3], 'valid')
+        conv3 = self.add_conv_layer(64, 96, [3, 3], 'valid')
 
         concat2 = self.concat_layers(conv2, conv3)
 
-        local_prev = self.add_max_pool(self.prev_blob, [1, 1], 2)
-        self.add_conv_layer(192, 192, [3,3], 'valid', prev_blob= concat2)
+        local_prev = self.add_max_pool(self.prev_blob, 1, 2)
+        self.add_conv_layer(192, 192, [3, 3], 'valid', prev_blob= concat2)
 
         self.concat_layers(local_prev, self.prev_blob)
 
@@ -223,31 +184,31 @@ class Inceptionv4():
     def Inception_A(self, input):
 
         self.add_avg_pool(input)
-        layer_1 = self.add_conv_layer(384, 96, [1,1], 'same')
+        layer_1 = self.add_conv_layer(384, 96, [1, 1], 'same')
 
-        layer_2 = self.add_conv_layer(384, 96, [1,1], 'same', prev_blob= input)
+        layer_2 = self.add_conv_layer(384, 96, [1, 1], 'same', prev_blob= input)
 
-        self.add_conv_layer(384, 64, [1,1], 'same', prev_blob = input)
-        layer_3 = self.add_conv_layer(64, 96, [3,3], 'same')
+        self.add_conv_layer(384, 64, [1, 1], 'same', prev_blob = input)
+        layer_3 = self.add_conv_layer(64, 96, [3, 3], 'same')
 
-        self.add_conv_layer(384, 64, [1,1], 'same', prev_blob= input)
-        self.add_conv_layer(64, 96, [3,3], 'same')
-        layer_4 = self.add_conv_layer(64, 96, [3,3], 'same')
+        self.add_conv_layer(384, 64, [1, 1], 'same', prev_blob= input)
+        self.add_conv_layer(64, 96, [3, 3], 'same')
+        layer_4 = self.add_conv_layer(64, 96, [3, 3], 'same')
 
         return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
 
     def Inception_B(self, input):
 
         self.add_avg_pool(input)
-        layer_1 = self.add_conv_layer(1024, 128, [1,1], 'same')
+        layer_1 = self.add_conv_layer(1024, 128, [1, 1], 'same')
 
-        layer_2 = self.add_conv_layer(1024, 384, [1,1], 'same', prev_blob= input)
+        layer_2 = self.add_conv_layer(1024, 384, [1, 1], 'same', prev_blob= input)
 
-        self.add_conv_layer(1024, 192, [1,1], 'same', prev_blob= input)
+        self.add_conv_layer(1024, 192, [1, 1], 'same', prev_blob= input)
         self.add_conv_layer(192, 224, [1, 7], 'same')
         layer_3 = self.add_conv_layer(224, 256, [1, 7], 'same')
 
-        self.add_conv_layer(1024, 192, [1,1], 'same', prev_blob= input)
+        self.add_conv_layer(1024, 192, [1, 1], 'same', prev_blob= input)
         self.add_conv_layer(192, 192, [1, 7], 'same')
         self.add_conv_layer(192, 224, [7, 1], 'same')
         self.add_conv_layer(224, 224, [1, 7], 'same')
@@ -258,15 +219,15 @@ class Inceptionv4():
     def Inception_C(self, input):
 
         self.add_avg_pool(input)
-        layer_1 = self.add_conv_layer(1536, 256, [1,1], 'same')
+        layer_1 = self.add_conv_layer(1536, 256, [1, 1], 'same')
 
-        layer_2 = self.add_conv_layer(1536, 256, [1,1], 'same', prev_blob= input)
+        layer_2 = self.add_conv_layer(1536, 256, [1, 1], 'same', prev_blob= input)
 
-        sub_layer_1 = self.add_conv_layer(1536, 384, [1,1], 'same', prev_blob= input)
+        sub_layer_1 = self.add_conv_layer(1536, 384, [1, 1], 'same', prev_blob= input)
         layer_3 = self.add_conv_layer(384, 256, [1, 3], 'same', prev_blob= sub_layer_1)
         layer_4 = self.add_conv_layer(384, 256, [3, 1], 'same', prev_blob= sub_layer_1)
 
-        self.add_conv_layer(1536, 384, [1,1], 'same', prev_blob= input)
+        self.add_conv_layer(1536, 384, [1, 1], 'same', prev_blob= input)
         self.add_conv_layer(384, 448, [1, 3], 'same')
         sub_layer_2 = self.add_conv_layer(448, 512, [3, 1], 'same')
         layer_5 = self.add_conv_layer(512, 256, [3, 1], 'same', prev_blob= sub_layer_2)
@@ -278,11 +239,11 @@ class Inceptionv4():
 
         layer_1 = self.add_max_pool(input, 3, 2)
 
-        layer_2 = self.add_conv_layer(384, 384, [3,3], 'valid', stride= 2, prev_blob= input)
+        layer_2 = self.add_conv_layer(384, 384, [3, 3], 'valid', stride= 2, prev_blob= input)
 
-        self.add_conv_layer(384, 192, [1,1], 'same', prev_blob= input)
-        self.add_conv_layer(192, 224, [3,3], 'same',)
-        layer_3 = self.add_conv_layer(224, 256, [3,3], 'valid', stride= 2)
+        self.add_conv_layer(384, 192, [1, 1], 'same', prev_blob= input)
+        self.add_conv_layer(192, 224, [3, 3], 'same',)
+        layer_3 = self.add_conv_layer(224, 256, [3, 3], 'valid', stride= 2)
 
         return self.concat_layers(layer_1, layer_2, layer_3)
 
@@ -290,13 +251,13 @@ class Inceptionv4():
 
         layer_1 = self.add_max_pool(input, 3, 2)
 
-        self.add_conv_layer(1024, 192, 1, 'same', prev_blob= input)
-        layer_2 = self.add_conv_layer(192, 192, [3,3], 'valid', stride= 2)
+        self.add_conv_layer(1024, 192, [1, 1], 'same', prev_blob= input)
+        layer_2 = self.add_conv_layer(192, 192, [3, 3], 'valid', stride= 2)
 
-        self.add_conv_layer(1024, 256, [1,1], 'same', prev_blob= input)
+        self.add_conv_layer(1024, 256, [1, 1], 'same', prev_blob= input)
         self.add_conv_layer(256, 256, [1, 7], 'same')
         self.add_conv_layer(256, 320, [7, 1], 'same')
-        layer_3 = self.add_conv_layer(320, 320, [3,3], 'valid', stride= 2)
+        layer_3 = self.add_conv_layer(320, 320, [3, 3], 'valid', stride= 2)
 
         return self.concat_layers(layer_1, layer_2, layer_3)
 

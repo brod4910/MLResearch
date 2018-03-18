@@ -106,7 +106,8 @@ def Train_Model():
 
     train_model.Print('accuracy', [], to_file=1)
     train_model.Print('loss', [], to_file=1)
-    train_model.Print('stem_concat_13', [])
+    train_model.Print('stem_conv_8', [])
+    train_model.Print('stem_conv_12', [])
 
     workspace.RunNetOnce(train_model.param_init_net)
     workspace.CreateNet(train_model.net, overwrite=True)
