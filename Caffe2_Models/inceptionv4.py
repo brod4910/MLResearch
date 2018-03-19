@@ -57,8 +57,8 @@ class Inceptionv4():
     def calculate_padding(self, padding_type, kernel):
         assert padding_type in ['same', 'valid']
         if padding_type == 'same':
-            return list((k - 1) // 2 for k in kernel)
-        return list(0 for __ in kernel)
+            return tuple((k - 1) // 2 for k in kernel)
+        return tuple(0 for __ in kernel)
 
     def add_conv_layer(self, input_filters, output_filters, kernel, padding_type, stride= 1, prev_blob= None):
         padding = self.calculate_padding(padding_type, kernel)
@@ -72,8 +72,11 @@ class Inceptionv4():
             output_filters,
             kernel= kernel,
             stride= stride,
-            pad_h= padding[0],
-            pad_w= padding[1],
+            # pad= padding,
+            pad_t= padding[0],
+            pad_b= padding[0],
+            pad_l= padding[1],
+            pad_r= padding[1],
             no_bias= True,
             )
         else:
@@ -85,8 +88,11 @@ class Inceptionv4():
                 output_filters,
                 kernel= kernel,
                 stride= stride,
-                pad_h= padding[0],
-                pad_w= padding[1],
+                # pad= padding,
+                pad_t= padding[0],
+                pad_b= padding[0],
+                pad_l= padding[1],
+                pad_r= padding[1],
                 no_bias= True,
                 )
 
@@ -108,13 +114,14 @@ class Inceptionv4():
         self.layer_num += 1
         return self.prev_blob
 
-    def add_avg_pool(self, prev_blob, kernel= 3, stride= 1, global_pool= False):
+    def add_avg_pool(self, prev_blob, kernel= 3, stride= 1, pad= 1,global_pool= False):
         self.prev_blob = brew.average_pool(
             self.model,
             prev_blob,
             '%s_avg_pool_%d' % (self.block_name, self.layer_num),
             kernel= kernel,
             stride= stride,
+            pad= pad,
             global_pooling= global_pool,
             )
         self.layer_num += 1
@@ -147,7 +154,7 @@ class Inceptionv4():
             args,
             '%s_concat_%d' % (self.block_name, self.layer_num),
             # add_axis= 0,
-            # axis= axis,
+            axis= axis,
             )
 
         self.layer_num += 1
@@ -156,28 +163,29 @@ class Inceptionv4():
     def Inception_Stem(self, data):
         self.add_conv_layer(3, 32, [3, 3], 'valid', stride= 2, prev_blob= data)
         self.add_conv_layer(32, 32, [3, 3], 'valid')
-        conv0 = self.add_conv_layer(32, 64, [3, 3], 'same')
+        branch0 = self.add_conv_layer(32, 64, [3, 3], 'same')
 
-        conv1 = self.add_conv_layer(64, 96, [3, 3], 'valid', stride= 2, prev_blob= conv0)
+        branch1 = self.add_conv_layer(64, 96, [3, 3], 'valid', stride= 2, prev_blob= branch0)
 
-        maxpool1 = self.add_max_pool(conv0, 3, 2)
+        maxpool1 = self.add_max_pool(branch0, 3, 2)
 
-        concat1 = self.concat_layers(conv1, maxpool1)
+        concat1 = self.concat_layers(branch1, maxpool1)
 
         self.add_conv_layer(160, 64, [1, 1], 'same', prev_blob= concat1)
-        conv2 = self.add_conv_layer(64, 96, [3, 3], 'valid')
+        branch2 = self.add_conv_layer(64, 96, [3, 3], 'valid')
 
         self.add_conv_layer(160, 64, [1, 1], 'same', prev_blob= concat1)
         self.add_conv_layer(64, 64, [1, 7], 'same')
         self.add_conv_layer(64, 64, [7, 1], 'same')
-        conv3 = self.add_conv_layer(64, 96, [3, 3], 'valid')
+        branch3 = self.add_conv_layer(64, 96, [3, 3], 'valid')
 
-        concat2 = self.concat_layers(conv2, conv3)
+        concat2 = self.concat_layers(branch2, branch3)
 
-        local_prev = self.add_max_pool(self.prev_blob, 1, 2)
-        self.add_conv_layer(192, 192, [3, 3], 'valid', prev_blob= concat2)
+        maxpool2 = self.add_max_pool(concat2, 3, 2)
 
-        self.concat_layers(local_prev, self.prev_blob)
+        branch4 = self.add_conv_layer(192, 192, [3, 3], 'valid', stride= 2, prev_blob= concat2)
+
+        self.concat_layers(maxpool2, branch4)
 
         return self.prev_blob
 
@@ -193,7 +201,7 @@ class Inceptionv4():
 
         self.add_conv_layer(384, 64, [1, 1], 'same', prev_blob= input)
         self.add_conv_layer(64, 96, [3, 3], 'same')
-        layer_4 = self.add_conv_layer(64, 96, [3, 3], 'same')
+        layer_4 = self.add_conv_layer(96, 96, [3, 3], 'same')
 
         return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
 
@@ -205,14 +213,14 @@ class Inceptionv4():
         layer_2 = self.add_conv_layer(1024, 384, [1, 1], 'same', prev_blob= input)
 
         self.add_conv_layer(1024, 192, [1, 1], 'same', prev_blob= input)
-        self.add_conv_layer(192, 224, [1, 7], 'same')
-        layer_3 = self.add_conv_layer(224, 256, [1, 7], 'same')
+        self.add_conv_layer(192, 224, [7, 1], 'same')
+        layer_3 = self.add_conv_layer(224, 256, [7, 1], 'same')
 
         self.add_conv_layer(1024, 192, [1, 1], 'same', prev_blob= input)
-        self.add_conv_layer(192, 192, [1, 7], 'same')
-        self.add_conv_layer(192, 224, [7, 1], 'same')
-        self.add_conv_layer(224, 224, [1, 7], 'same')
-        layer_4 = self.add_conv_layer(224, 256, [7, 1], 'same')
+        self.add_conv_layer(192, 192, [7, 1], 'same')
+        self.add_conv_layer(192, 224, [1, 7], 'same')
+        self.add_conv_layer(224, 224, [7, 1], 'same')
+        layer_4 = self.add_conv_layer(224, 256, [1, 7], 'same')
 
         return self.concat_layers(layer_1, layer_2, layer_3, layer_4)
 
@@ -228,8 +236,8 @@ class Inceptionv4():
         layer_4 = self.add_conv_layer(384, 256, [3, 1], 'same', prev_blob= sub_layer_1)
 
         self.add_conv_layer(1536, 384, [1, 1], 'same', prev_blob= input)
-        self.add_conv_layer(384, 448, [1, 3], 'same')
-        sub_layer_2 = self.add_conv_layer(448, 512, [3, 1], 'same')
+        self.add_conv_layer(384, 448, [3, 1], 'same')
+        sub_layer_2 = self.add_conv_layer(448, 512, [1, 3], 'same')
         layer_5 = self.add_conv_layer(512, 256, [3, 1], 'same', prev_blob= sub_layer_2)
         layer_6 = self.add_conv_layer(512, 256, [1, 3], 'same', prev_blob= sub_layer_2)
 
