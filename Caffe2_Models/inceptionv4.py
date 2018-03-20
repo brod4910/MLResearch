@@ -3,7 +3,7 @@ import skimage.io as io
 import skimage.transform 
 import sys
 import numpy as np
-import os
+import os,sys,inspect
 from math import ceil
 import caffe2.python.predictor.predictor_exporter as pe
 from matplotlib import pyplot
@@ -136,6 +136,17 @@ class Inceptionv4():
             is_test= is_test
             )
         self.layer_num += 1
+        return self.prev_blob
+
+    def add_fc_layer(self, prev_blob, num_labels):
+        self.prev_blob = brew.fc(
+                self.model,
+                prev_blob,
+                'pred',
+                1536,
+                num_labels,
+                )
+
         return self.prev_blob
 
     def add_softmax(self, prev_blob, label= None):
@@ -307,7 +318,11 @@ def create_Inceptionv4(model, data, num_labels, label= None, is_test= False, no_
     inception.block_name = 'end_layers'
     inception.layer_num = 1
 
-    prev_blob = inception.add_avg_pool(prev_blob)
+    prev_blob = inception.add_avg_pool(prev_blob, kernel= 8, pad= 0)
     prev_blob = inception.add_dropout(prev_blob, .8)
+
+    prev_blob = inception.model.Flatten(prev_blob)
+
+    prev_blob = inception.add_fc_layer(prev_blob, num_labels)
 
     return inception.add_softmax(prev_blob, label)

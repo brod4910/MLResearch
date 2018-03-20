@@ -95,10 +95,16 @@ def Train_Model():
     # data, label = AddInput(train_model, batch_size=64, db=os.path.join(data_folder,'blood_cells_train_lmdb'), db_type='lmdb')
 
     softmax, loss = inceptionv4.create_Inceptionv4(train_model, data, 4, label)
+    # softmax = train_model.Squeeze(softmax, 'softmax_squeeze', dims=[2,3])
 
     accuracy = train_model.Accuracy([softmax, label], "accuracy")
 
-    train_model.AddGradientOperators([loss])
+    # brew.accuracy(train_model, [softmax, "label"], "accuracy")
+
+    # xent = train_model.net.LabelCrossEntropy([softmax, "label"], "xent")
+    # train_model.net.AveragedLoss(xent, "loss")
+
+    train_model.AddGradientOperators(["loss"])
     optimizer.build_adam(
         train_model,
         base_learning_rate=.001,
@@ -106,8 +112,8 @@ def Train_Model():
 
     train_model.Print('accuracy', [], to_file=1)
     train_model.Print('loss', [], to_file=1)
-    train_model.Print('stem_conv_8', [])
-    train_model.Print('stem_conv_12', [])
+    train_model.Print('label', [], to_file=1)
+    train_model.Print('softmax', [], to_file=1)
 
     workspace.RunNetOnce(train_model.param_init_net)
     workspace.CreateNet(train_model.net, overwrite=True)
@@ -117,7 +123,7 @@ def Train_Model():
     # # _ = visualize.NCHW.ShowMultiple(data)
     # pyplot.show()
 
-    total_iters = 200
+    total_iters = 10
     accuracy = np.zeros(total_iters)
     loss = np.zeros(total_iters)
 
