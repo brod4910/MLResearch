@@ -123,7 +123,7 @@ def Train_Model():
     # # _ = visualize.NCHW.ShowMultiple(data)
     # pyplot.show()
 
-    total_iters = 10
+    total_iters = 500
     accuracy = np.zeros(total_iters)
     loss = np.zeros(total_iters)
 
@@ -132,11 +132,11 @@ def Train_Model():
         accuracy[i] = workspace.blobs['accuracy']
         loss[i] = workspace.blobs['loss']
 
-    pyplot.plot(loss, 'b')
-    pyplot.plot(accuracy, 'r')
-    pyplot.legend(('Loss', 'Accuracy'), loc='upper right')
+    # pyplot.plot(loss, 'b')
+    # pyplot.plot(accuracy, 'r')
+    # pyplot.legend(('Loss', 'Accuracy'), loc='upper right')
 
-    pyplot.show()
+    # pyplot.show()
     # for b in workspace.Blobs(): print(b)
 
     # graph = net_drawer.GetPydotGraphMinimal(train_model.net.Proto().op, "Inception", rankdir="LR", minimal_dependency=True)
