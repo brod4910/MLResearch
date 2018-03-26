@@ -42,7 +42,7 @@ class VGG19():
         This is techincally both block 3 and 4.
         Input_filter controls the type of block it is.
     '''
-    def VGG_block_3(self, input, input_filter):
+    def VGG_block_3_4(self, input, input_filter):
         self.la.add_conv_layer(input_filter, 512, [3, 3], 'same', prev_blob= input)
 
         for i in range(3):
@@ -77,11 +77,11 @@ def create_VGG19(model, data, num_labels, label= None, is_test= False, no_loss= 
 
     vgg19.la.block_name = 'block_3'
     vgg19.la.layer_num = 1
-    prev_blob = vgg19.VGG_block_3(prev_blob, 256)
+    prev_blob = vgg19.VGG_block_3_4(prev_blob, 256)
 
     vgg19.la.block_name = 'block_4'
     vgg19.la.layer_num = 1
-    prev_blob = vgg19.VGG_block_3(prev_blob, 512)
+    prev_blob = vgg19.VGG_block_3_4(prev_blob, 512)
 
     vgg19.la.block_name = 'block_final'
     vgg19.la.layer_num = 1
