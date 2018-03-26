@@ -127,10 +127,11 @@ class Layer_Adder():
         self.prev_blob = brew.fc(
                 self.model,
                 prev_blob,
-                'pred',
+                '%s_fc_%d' % (self.block_name, self.layer_num),
                 num_inputs,
                 num_labels,
                 )
+        self.add_relu_activ()
 
         return self.prev_blob
 

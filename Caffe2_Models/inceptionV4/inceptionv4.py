@@ -179,4 +179,4 @@ def create_Inceptionv4(model, data, num_labels, label= None, is_test= False, no_
 
     prev_blob = inception.la.add_fc_layer(prev_blob, 1536, num_labels)
 
-    return inception.la.add_softmax(prev_blob, label)
+    return inception.la.add_softmax(prev_blob, label= label)
