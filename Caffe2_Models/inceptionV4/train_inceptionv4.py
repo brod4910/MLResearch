@@ -45,7 +45,7 @@ def AddImageInput(model, reader, batch_size, img_size, dtype, is_test):
         use_caffe_datum=False,
         # mean=128.,
         # std=128.,
-        scale=299,
+        scale=img_size,
         crop=img_size,
         db_type= 'lmdb',
         # mirror=1,

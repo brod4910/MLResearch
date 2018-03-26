@@ -16,9 +16,9 @@ from caffe2.python import (
 
 class VGG19():
 
-	def __init__(self, model, is_test):
-		self.model = model
-		la = layer_adder.Layer_Adder(model, is_test)
+    def __init__(self, model, is_test):
+        self.model = model
+        self.la = layer_adder.Layer_Adder(model, is_test)
 
     def VGG_block_0(self, input):
         self.la.add_conv_layer(3, 64, [3, 3], 'same', prev_blob= input)
@@ -51,29 +51,40 @@ class VGG19():
         return self.la.add_max_pool(conv, 2, 2)
 
     def VGG_block_final(self, input, num_labels):
-        fc1 = self.la.add_fc_layer(input, 512, 4096)
+        fc1 = self.la.add_fc_layer(input, 512 * 7 * 7, 4096)
         dp1 = self.la.add_dropout(fc1, .5)
         flat1 = self.la.model.Flatten(dp1)
 
         fc2 = self.la.add_fc_layer(flat1, 4096, 4096)
-        dp2 = self.add_dropout(fc2, .5)
+        dp2 = self.la.add_dropout(fc2, .5)
         flat2 = self.la.model.Flatten(dp2)
 
-        return fc3 = self.add_fc_layer(flat2, 4096, num_labels)
+        return self.la.add_fc_layer(flat2, 4096, num_labels)
 
 def create_VGG19(model, data, num_labels, label= None, is_test= False, no_loss= False, no_bias= True):
     vgg19 = VGG19(model, is_test)
 
+    vgg19.la.block_name = 'block_0'
     prev_blob = vgg19.VGG_block_0(data)
 
+    vgg19.la.block_name = 'block_1'
+    vgg19.la.layer_num = 1
     prev_blob = vgg19.VGG_block_1(prev_blob)
 
+    vgg19.la.block_name = 'block_2'
+    vgg19.la.layer_num = 1
     prev_blob = vgg19.VGG_block_2(prev_blob)
 
+    vgg19.la.block_name = 'block_3'
+    vgg19.la.layer_num = 1
     prev_blob = vgg19.VGG_block_3(prev_blob, 256)
 
+    vgg19.la.block_name = 'block_4'
+    vgg19.la.layer_num = 1
     prev_blob = vgg19.VGG_block_3(prev_blob, 512)
 
+    vgg19.la.block_name = 'block_final'
+    vgg19.la.layer_num = 1
     prev_blob = vgg19.VGG_block_final(prev_blob, num_labels)
 
     return vgg19.la.add_softmax(prev_blob, label= label)
