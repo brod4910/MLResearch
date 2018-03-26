@@ -25,7 +25,6 @@ class Inceptionv4():
     def __init__(self, model, is_test):
         self.model = model
         self.la = layer_adder.Layer_Adder(model, is_test)
-        self.prev_blob = None
 
     def Inception_Stem(self, data):
         self.la.add_conv_layer(3, 32, [3, 3], 'valid', stride= 2, prev_blob= data)

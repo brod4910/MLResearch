@@ -92,17 +92,9 @@ def Train_Model():
 
     data, label = AddImageInput(train_model, reader, 64, 299, 'lmdb', False)
 
-    # data, label = AddInput(train_model, batch_size=64, db=os.path.join(data_folder,'blood_cells_train_lmdb'), db_type='lmdb')
-
     softmax, loss = inceptionv4.create_Inceptionv4(train_model, data, 4, label)
-    # softmax = train_model.Squeeze(softmax, 'softmax_squeeze', dims=[2,3])
 
     accuracy = train_model.Accuracy([softmax, label], "accuracy")
-
-    # brew.accuracy(train_model, [softmax, "label"], "accuracy")
-
-    # xent = train_model.net.LabelCrossEntropy([softmax, "label"], "xent")
-    # train_model.net.AveragedLoss(xent, "loss")
 
     train_model.AddGradientOperators(["loss"])
     optimizer.build_yellowfin(
@@ -111,10 +103,10 @@ def Train_Model():
         # allow_lr_injection= True,
         )
 
-    # train_model.Print('accuracy', [], to_file=1)
-    # train_model.Print('loss', [], to_file=1)
-    # train_model.Print('label', [], to_file=1)
-    # train_model.Print('softmax', [], to_file=1)
+    train_model.Print('accuracy', [], to_file=1)
+    train_model.Print('loss', [], to_file=1)
+    train_model.Print('label', [], to_file=1)
+    train_model.Print('softmax', [], to_file=1)
 
     workspace.RunNetOnce(train_model.param_init_net)
     workspace.CreateNet(train_model.net, overwrite=True)
@@ -124,24 +116,21 @@ def Train_Model():
     # # _ = visualize.NCHW.ShowMultiple(data)
     # pyplot.show()
 
-    # total_iters = 500
-    # accuracy = np.zeros(total_iters)
-    # loss = np.zeros(total_iters)
+    total_iters = 500
+    accuracy = np.zeros(total_iters)
+    loss = np.zeros(total_iters)
 
-    # for i in range(total_iters):
-    #     workspace.RunNet(train_model.net)
-    #     accuracy[i] = workspace.blobs['accuracy']
-    #     loss[i] = workspace.blobs['loss']
+    for i in range(total_iters):
+        workspace.RunNet(train_model.net)
+        accuracy[i] = workspace.blobs['accuracy']
+        loss[i] = workspace.blobs['loss']
 
-    # pyplot.plot(loss, 'b')
-    # pyplot.plot(accuracy, 'r')
-    # pyplot.legend(('Loss', 'Accuracy'), loc='upper right')
+    pyplot.plot(loss, 'b')
+    pyplot.plot(accuracy, 'r')
+    pyplot.legend(('Loss', 'Accuracy'), loc='upper right')
 
-    # pyplot.show()
-    # for b in workspace.Blobs(): print(b)
-
-    graph = net_drawer.GetPydotGraphMinimal(train_model.net.Proto().op, "Inception", rankdir="LR", minimal_dependency=True)
-    graph.write_png("Inception.png")
+    # graph = net_drawer.GetPydotGraphMinimal(train_model.net.Proto().op, "Inception", rankdir="LR", minimal_dependency=True)
+    # graph.write_png("Inception.png")
 
 
 if __name__ == '__main__':
