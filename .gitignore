@@ -2,3 +2,6 @@ datasets/blood-cells/dataset2-master/blood_cells_test_lmdb
 datasets/blood-cells/dataset2-master/blood_cells_train_lmdb
 datasets/blood-cells/dataset2-master/blood_cells_test_lmdb.zip
 datasets/blood-cells/dataset2-master/blood_cells_train_lmdb.zip
+
+*.pyc
+__pycache__
