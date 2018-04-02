@@ -32,8 +32,8 @@ import caffe2.python.predictor.predictor_py_utils as pred_utils
 from caffe2.python.predictor_constants import predictor_constants as predictor_constants
 
 
-def Train_Model():
-    current_folder = os.path.join(os.path.expanduser('~'), 'Development', 'MLResearch', 'datasets',
+def Train_Model(args):
+    current_folder = os.path.join(sys.path[0], '../../', 'datasets',
      'blood-cells')
     print(current_folder)
     data_folder = os.path.join(current_folder, 'dataset2-master')
@@ -57,10 +57,11 @@ def Train_Model():
 
 
     train_data_db = os.path.join(data_folder,'blood_cells_train_lmdb')
+    test_data_db = os.path.join(data_folder, 'blood_cells_test_lmdb')
 
     arg_scope = {
     "order" : "NCHW",
-    "use_cudnn" : True,
+    "use_cudnn" : args.gpu,
     }
     train_model = model_helper.ModelHelper(name="vgg19_train", arg_scope=arg_scope)
 
@@ -70,12 +71,14 @@ def Train_Model():
         db_type= 'lmdb',
         )
 
-    gpus = [0, 1]
+    devices = []
+    for i in range(args.shards):
+        devices.append(i)
 
     train_data_count = 9893
 
     batch_per_device = 16
-    total_batch_size = batch_per_device * len(gpus)
+    total_batch_size = batch_per_device * len(devices)
 
     num_labels = 4
 
@@ -109,8 +112,6 @@ def Train_Model():
         )
         # prevent back-propagation: optional performance improvement; may not be observable at small scale
         data = model.StopGradient(data, data)
-
-    # data, label = AddImageInput(train_model, reader, 64, 224, 'lmdb', False)
 
     def create_vgg_model_ops(model, loss_scale= 1.0):
         [softmax, loss] = vgg19.create_VGG19(model, "data", num_labels, "label")
@@ -148,14 +149,24 @@ def Train_Model():
                 nesterov=1,
             )
 
-    dpm.Parallelize_GPU(
-        train_model,
-        input_builder_fun=add_image_input_ops,
-        forward_pass_builder_fun=create_vgg_model_ops,
-        param_update_builder_fun=add_parameter_update_ops,
-        devices=gpus,
-        optimize_gradient_memory=True,
-    )
+    if args.gpu:
+        dpm.Parallelize_GPU(
+            train_model,
+            input_builder_fun=add_image_input_ops,
+            forward_pass_builder_fun=create_vgg_model_ops,
+            param_update_builder_fun=add_parameter_update_ops,
+            devices=devices,
+            optimize_gradient_memory=True,
+        )
+    else:
+        dpm.Parallelize_CPU(
+            train_model,
+            input_builder_fun=add_image_input_ops,
+            forward_pass_builder_fun=create_vgg_model_ops,
+            param_update_builder_fun=add_parameter_update_ops,
+            devices=devices,
+            optimize_gradient_memory=True,
+            )
 
     train_model.Print('accuracy', [], to_file=1)
     train_model.Print('loss', [], to_file=1)
@@ -165,11 +176,35 @@ def Train_Model():
     workspace.RunNetOnce(train_model.param_init_net)
     workspace.CreateNet(train_model.net, overwrite=True)
 
+    def accuracy(model):
+        accuracy = []
+        prefix = model.net.Proto().name
+        for device in model._devices:
+            accuracy.append(
+                np.asscalar(workspace.FetchBlob("{}_{}/{}_accuracy".format('gpu' if args.gpu else 'cpu', device, prefix))))
+        return np.average(accuracy)
 
     # graph = net_drawer.GetPydotGraphMinimal(train_model.net.Proto().op, "Inception", rankdir="LR", minimal_dependency=True)
     # graph.write_png("VGG19.png")
 
 
+def GetArgParser():
+    parser = argparse.ArgumentParser(description='VGG19 Train')
+
+    parser.add_argument(
+        '--shards', 
+        type=int, 
+        default=1)
+    parser.add_argument(
+        '--gpu',
+        action='store_true',
+        )
+
+    return parser
+
 if __name__ == '__main__':
     core.GlobalInit(['caffe2', '--caffe2_log_level=0'])
-    Train_Model()
+
+    args = GetArgParser().parse_known_args()
+
+    Train_Model(args)
