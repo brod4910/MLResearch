@@ -34,14 +34,18 @@ from caffe2.python.predictor_constants import predictor_constants as predictor_c
 
 
 def Train_Model(args):
+
+    # Get relative path name of current directory
     dir_path = os.path.dirname(os.path.realpath(__file__))
+    # create folder path for data sets
     current_folder = os.path.join(dir_path, '../../', 'datasets',
      'blood-cells')
-
     data_folder = os.path.join(current_folder, 'dataset2-master')
     root_folder = current_folder
+
     db_missing = False
 
+    # find the dataset folder
     if not os.path.exists(data_folder):
         os.makedirs(data_folder)   
         print("Your data folder was not found!! This was generated: {}".format(data_folder))
@@ -61,6 +65,7 @@ def Train_Model(args):
         print("DB is not found. Please fix file paths")
         sys.exit()
 
+    # prepare the databases for training
     train_data_db = os.path.join(data_folder,'blood_cells_train_lmdb')
     test_data_db = os.path.join(data_folder, 'blood_cells_test_lmdb')
 
@@ -76,6 +81,7 @@ def Train_Model(args):
         db_type= 'lmdb',
         )
 
+    # prepare precursor hyper-parameters
     devices = []
     for i in range(args.shards):
         devices.append(i)
