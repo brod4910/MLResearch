@@ -176,7 +176,7 @@ def Train_Model(args):
             forward_pass_builder_fun=create_vgg_model_ops,
             param_update_builder_fun=add_parameter_update_ops,
             devices=devices,
-            optimize_gradient_memory=True,
+            dynamic_memory_management=True,
         )
     else:
         dpm.Parallelize_CPU(
@@ -267,7 +267,8 @@ def GetArgParser():
         '-s',
         '--shards', 
         type=int, 
-        default=1)
+        default=1,
+        )
     parser.add_argument(
         '-g',
         '--gpu',

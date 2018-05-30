@@ -1,4 +1,4 @@
-# Machine Learning Research 5/15/17 - Present
+# Machine Learning Research 5/15/17 - 5/04/17
 
 ## Backstory
 
